@@ -4,38 +4,68 @@ import Core.Models.exceptions.EventException;
 import Core.Interfaces.EventServiceInterface;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import Core.Models.Event;
 
 public class EventService implements EventServiceInterface {
 
-    //TODO variable to store events
+    ArrayList<Event> EventList = new ArrayList<>();
 
     public Event createEvent(String name, String location, LocalDateTime time, int ticketsAvailable) throws EventException {
 
-        //TODO
+        Event event = new Event(
+                UUID.randomUUID(),
+                name,
+                location,
+                time,
+                ticketsAvailable
+        );
+        EventList.add(event);
 
-        return null;
+        return event;
     }
 
     @Override
     public Event getEventById(UUID id) {
 
-        //TODO
 
-        return null;
+        for (Event event : EventList) {
+            if (event.getId().equals(id)) {
+                return event;
+            }
+        }
+
+        throw new EventException("Event with ID " + id + " not found");
     }
 
     @Override
     public void updateEvent(Event event) throws EventException {
 
-        //TODO
+        UUID uuid = event.getId();
+
+        for (Event e : EventList) {
+            if (e.getId().equals(uuid)) {
+                if(e.getTicketsAvailable().get() > event.getTicketsAvailable().get()){
+                    throw new EventException("Cannot increase tickets available");
+                }
+                e.setName(event.getName());
+                e.setLocation(event.getLocation());
+                e.setTime(event.getTime());
+                e.getTicketsAvailable().set(event.getTicketsAvailable().get());
+                validateUpdatedEvent(e);
+                return;
+            }
+        }
 
     }
 
     private void validateUpdatedEvent(Event event){
 
-        //TODO
+        if(event.getTime().isBefore(LocalDateTime.now())){
+            throw new EventException("DateTime of Event can't be set into the past");
+        }
+        if(event.getTicketsAvailable().get() < 0){
+            throw new EventException("Tickets available cannot be negative");
+        }
 
     }
 
@@ -43,22 +73,26 @@ public class EventService implements EventServiceInterface {
     @Override
     public void deleteEvent(UUID id) {
 
-        //TODO
+        for (Event event : EventList) {
+            if (event.getId().equals(id)) {
+                EventList.remove(event);
+                return;
+            }
+        }
+        throw new EventException("Event with ID " + id + " not found");
 
     }
 
     @Override
     public List<Event> getAllEvents() {
 
-        //TODO
-
-        return null;
+        return EventList;
     }
 
     @Override
     public void deleteAllEvents() {
 
-        //TODO
+        EventList.clear();
 
     }
 
