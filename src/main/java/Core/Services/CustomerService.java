@@ -28,6 +28,8 @@ public class CustomerService implements CustomerServiceInterface {
 
         Customer customer = new Customer(UUID.randomUUID(), username, email, dateOfBirth);
 
+        customersById.put(customer.getId(),customer);
+
         return new Customer(
             customer.getId(),
             customer.getUsername(),
@@ -38,15 +40,43 @@ public class CustomerService implements CustomerServiceInterface {
 
     public Customer getCustomerById(UUID id) throws CustomerException {
 
-        //TODO
 
-        return null;
+        Customer customer = customersById.get(id);
+        if (customer != null) {
+            return new Customer(
+                    id,
+                    customer.getUsername(),
+                    customer.getEmail(),
+                    customer.getDateOfBirth()
+            );
+        } else {
+            throw new CustomerException("Customer not found.");
+        }
+
     }
 
 
     public void updateCustomer(Customer customer) throws CustomerException {
 
-        //TODO
+        UUID id = customer.getId();
+        String email = customer.getEmail();
+        LocalDate dateOfBirth = customer.getDateOfBirth();
+
+        boolean multipleAtSymbols = email.chars().filter(ch -> ch == '@').count() > 1;
+
+        if (!email.contains("@") || multipleAtSymbols) {
+            throw new CustomerException("Invalid email");
+        }
+        if (customersById.get(customer.getId()) == null) {
+            throw new CustomerException("Customer does not exist");
+        }
+
+        if(dateOfBirth.isAfter(LocalDate.now().minusYears(18))) {
+            throw new CustomerException("User has to be 18 years old");
+        }
+
+        customersById.put(customer.getId(), customer);
+
 
     }
 
@@ -54,20 +84,32 @@ public class CustomerService implements CustomerServiceInterface {
 
     public void deleteCustomer(UUID id) throws IllegalArgumentException {
 
-        //TODO
+        customersById.remove(id);
+
+        return;
 
     }
 
     public List<Customer> getAllCustomers() {
 
-        //TODO
+        List<Customer> allCustomers = new ArrayList<>();
 
-        return null;
+        for (Customer customer : customersById.values()) {
+            allCustomers.add(new Customer(customer.getId(),
+                    customer.getUsername(),
+                    customer.getEmail(),
+                    customer.getDateOfBirth()));
+        }
+
+        return allCustomers;
+
+
     }
 
     public void deleteAllCustomers() {
 
-        //TODO
+        customersById.clear();
+        return;
 
     }
 
