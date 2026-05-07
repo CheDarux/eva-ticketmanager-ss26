@@ -5,112 +5,109 @@ import Core.Interfaces.CustomerServiceInterface;
 import java.time.LocalDate;
 import java.util.*;
 import Core.Models.Customer;
+import Core.Models.Ticket;
+import IDGenerator.IDService.IDService;
+import IDGenerator.IDService.IDServiceInterface;
 
 public class CustomerService implements CustomerServiceInterface {
 
-    private final Map<UUID, Customer> customersById = new HashMap<>();
+    private final Map<Long, Customer> customersById = new HashMap<>();
+    private final TicketService ticketService;
+    private final IDServiceInterface idService;
+
+    public CustomerService(TicketService ticketService, IDServiceInterface idService) {
+        this.ticketService = ticketService;
+        this.idService = idService;
+    }
 
     public Customer createCustomer(
         String username,
         String email,
         LocalDate dateOfBirth
     ) throws IllegalArgumentException {
+        long id = idService.getUnusedId();
+        Customer customer = new Customer(id, username, email, dateOfBirth);
+        saveCustomer(customer);
 
-        boolean multipleAtSymbols = email.chars().filter(ch -> ch == '@').count() > 1;
-
-        if (!email.contains("@") || multipleAtSymbols) {
-            throw new CustomerException("Invalid email");
-        }
-
-        if(dateOfBirth.isAfter(LocalDate.now().minusYears(18))) {
-            throw new CustomerException("User has to be 18 years old");
-        }
-
-        Customer customer = new Customer(UUID.randomUUID(), username, email, dateOfBirth);
-
-        customersById.put(customer.getId(),customer);
-
-        return new Customer(
-            customer.getId(),
-            customer.getUsername(),
-            customer.getEmail(),
-            customer.getDateOfBirth()
-        );
+        return customer;
     }
 
-    public Customer getCustomerById(UUID id) throws CustomerException {
+    public Customer getCustomerById(long id) throws CustomerException {
+            if (id <= 0 || !customersById.containsKey(id)) {
+                throw CustomerException.customerDoesNotExist();
+            }
 
-
-        Customer customer = customersById.get(id);
-        if (customer != null) {
-            return new Customer(
-                    id,
-                    customer.getUsername(),
-                    customer.getEmail(),
-                    customer.getDateOfBirth()
-            );
-        } else {
-            throw new CustomerException("Customer not found.");
-        }
-
+        return clone(customersById.get(id));
     }
 
 
     public void updateCustomer(Customer customer) throws CustomerException {
-
-        UUID id = customer.getId();
-        String email = customer.getEmail();
-        LocalDate dateOfBirth = customer.getDateOfBirth();
-
-        boolean multipleAtSymbols = email.chars().filter(ch -> ch == '@').count() > 1;
-
-        if (!email.contains("@") || multipleAtSymbols) {
-            throw new CustomerException("Invalid email");
-        }
-        if (customersById.get(customer.getId()) == null) {
-            throw new CustomerException("Customer does not exist");
-        }
-
-        if(dateOfBirth.isAfter(LocalDate.now().minusYears(18))) {
-            throw new CustomerException("User has to be 18 years old");
-        }
-
-        customersById.put(customer.getId(), customer);
-
-
+        validateUpdatedCustomer(customer);
+        saveCustomer(customer);
     }
 
+    public void addTicketToCustomer(Ticket ticket){
+        Customer customer = getCustomerById(ticket.getCustomerId());
+        customer.getTicketsBought().add(ticket.getId());
+        customersById.put(customer.getId(), customer);
+    }
 
+    public void removeTicketFromCustomer(Ticket ticket){
+        Customer customer = getCustomerById(ticket.getCustomerId());
+        customer.ticketDeleted(ticket.getId());
+        customersById.put(customer.getId(), customer);
+    }
 
-    public void deleteCustomer(UUID id) throws IllegalArgumentException {
-
-        customersById.remove(id);
-
-        return;
-
+    public void deleteCustomer(long id) throws IllegalArgumentException {
+        Customer customer = customersById.remove(id);
+        if (customer != null) {
+            List<Long> ticketIds = new ArrayList<>(customer.getTicketsBought());
+            ticketIds.forEach(ticketService::deleteTicket);
+        }
     }
 
     public List<Customer> getAllCustomers() {
-
-        List<Customer> allCustomers = new ArrayList<>();
-
-        for (Customer customer : customersById.values()) {
-            allCustomers.add(new Customer(customer.getId(),
-                    customer.getUsername(),
-                    customer.getEmail(),
-                    customer.getDateOfBirth()));
-        }
-
-        return allCustomers;
-
-
+        return new ArrayList<>(customersById.values());
     }
 
     public void deleteAllCustomers() {
-
         customersById.clear();
-        return;
-
+        ticketService.deleteAllTickets();
     }
 
+    private void validateCustomer(Customer customer){
+        if (LocalDate.now().minusYears(18).isBefore(customer.getDateOfBirth())) {
+            throw CustomerException.customerUnder18();
+        }
+
+        if (
+            !customer.getEmail().contains("@") ||
+            customer.getEmail().indexOf("@") !=
+            customer.getEmail().lastIndexOf("@") ||
+            !(customer.getEmail().lastIndexOf(".") >
+            customer.getEmail().indexOf("@"))
+        ) {
+            throw CustomerException.invalidEmail();
+        }
+    }
+
+    private void validateUpdatedCustomer(Customer updatedCustomer) throws CustomerException {
+        getCustomerById(updatedCustomer.getId());
+    }
+
+    private void saveCustomer(Customer customer) throws CustomerException{
+        validateCustomer(customer);
+        customersById.put(customer.getId(), clone(customer));
+    }
+
+    private Customer clone(Customer customer){
+        Customer customerClone = new Customer(
+                customer.getId(),
+                customer.getUsername(),
+                customer.getEmail(),
+                customer.getDateOfBirth()
+        );
+        customerClone.getTicketsBought().addAll(customer.getTicketsBought());
+        return customerClone;
+    }
 }
